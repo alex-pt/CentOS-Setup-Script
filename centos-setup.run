@@ -1,0 +1,115 @@
+#!/bin/bash
+
+#start
+uname -a;
+cat /etc/issue;
+
+#YUM
+rpm -Uvh http://download.fedora.redhat.com/pub/epel/5/i386/epel-release-5-4.noarch.rpm
+rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-5.rpm
+rpm -Uvh http://repo.webtatic.com/yum/centos/5/latest.rpm
+wget http://dl.iuscommunity.org/pub/ius/stable/Redhat/5.5/x86_64/ius-release-1.0-6.ius.el5.noarch.rpm
+wget http://dl.iuscommunity.org/pub/ius/stable/Redhat/5.5/x86_64/epel-release-1-1.ius.el5.noarch.rpm
+rpm -Uvh ius-release-1.0-6.ius.el5.noarch.rpm
+rpm -Uvh epel-release-1-1.ius.el5.noarch.rpm
+yum update
+yum install bison bison-devel ncurses-devel libtool gcc gcc-c++ libstdc++ libstdc++-devel vim-common vim-enhanced vim-minimal p7zip p7zip-plugins GeoIP GeoIP-data GeoIP-devel imake cmake automake make subversion subversion-devel git git-all bzr bzrtools libaio libaio-devel perl-IO-AIO passwd ircd-ratbox-mkpasswd telnet libtelnet libtelnet-devel libtelnet-utils maatkit patch patchutils libedit
+
+
+
+
+#NGINX @todo enhance config
+cd /usr/local/src/
+wget http://nginx.org/download/nginx-1.0.4.tar.gz
+tar xvfz nginx-1.0.4.tar.gz
+cd nginx-1.0.4
+./configure --with-http_geoip_module --with-http_stub_status_module
+make && make install
+wget -O/etc/init.d/nginx http://dl.dropbox.com/u/17616595/used-scripts/nginx
+chmod +x /etc/init.d/nginx
+/etc/init.d/nginx restart
+groupadd bubuka
+useradd bubuka -g bubuka
+mkdir /home/bubuka/web
+chmod -R 755 /home/bubuka/web
+mv /usr/local/nginx/conf/nginx.conf /usr/local/nginx/conf/nginx.conf.old
+wget -O/usr/local/nginx/conf/fcgi http://dl.dropbox.com/u/17616595/used-scripts/fcgi
+wget -O/usr/local/nginx/conf/nginx.conf http://dl.dropbox.com/u/17616595/used-scripts/nginx.conf
+/etc/init.d/nginx reload
+
+
+
+
+#PERCONA-SERVER/XtraDB/XtraBackup
+# @todo enhance config
+cd /usr/local/src
+wget http://www.percona.com/redir/downloads/Percona-Server-5.1/Percona-Server-5.1.57-12.8/source/Percona-Server-5.1.57.tar.gz
+tar xvfz Percona-Server-5.1.57.tar.gz
+cd Percona-Server-5.1.57
+groupadd mysql
+useradd mysql -g mysql
+./configure  --with-charset=utf8 --with-extra-charsets=all --without-plugin-innobase --with-plugins=innodb_plugin --with-mysqld-user=mysql --with-unix-socket-path=/tmp/mysql.sock --with-zlib-dir=bundled
+make && make install
+/usr/local/bin/mysql_install_db
+ln -s /var/lib/mysql/mysql.sock /tmp/mysql.sock
+mkdir /var/run/mysqld/
+chown -R mysql:mysql /var/run/mysqld/
+chmod -R 777 /var/run/mysqld/
+chmod +x /etc/init.d/mysql
+cp support-files/mysql.server /etc/init.d/mysql
+mv /etc/my.cnf /etc/my.cnf.old
+touch /var/log/mysql.slow.log
+wget -O/etc/my.cnf http://dl.dropbox.com/u/17616595/used-scripts/my.cnf
+/etc/init.d/mysql restart
+/usr/local/bin/mysql_secure_installation
+chmod -R 777 /tmp
+/etc/init.d/mysql restart
+
+cd /usr/local/src
+wget http://www.percona.com/redir/downloads/XtraBackup/XtraBackup-1.6/source/xtrabackup-1.6.tar.gz
+tar xvfz xtrabackup-1.6.tar.gz
+cd xtrabackup-1.6
+utils/build.sh xtradb51
+cp ./Percona-Server/storage/innodb_plugin/xtrabackup/xtrabackup /usr/bin/xtrabackup
+cp innobackupex /usr/bin/innobackupex
+
+
+
+#PHP/PHP-FPM/PECL/PEAR @todo enhance config
+
+yum remove php53*
+yum install php53u php53u-bcmath  php53u-cli  php53u-common  php53u-dba  php53u-debuginfo  php53u-devel  php53u-fpm  php53u-gd  php53u-intl  php53u-mbstring  php53u-mcrypt php53u-mysql php53u-odbc php53u-pdo php53u-pecl-imagick php53u-pecl-xdebug  php53u-pecl-xdebug-debuginfo php53u-process php53u-snmp php53u-suhosin php53u-suhosin-debuginfo php53u-tidy php53u-xml  php53u-xmlrpc php53u-pear 
+
+mv /etc/php-fpm.conf /etc/php-fpm-conf.old
+wget -O/etc/php-fpm.conf http://dl.dropbox.com/u/17616595/used-scripts/php-fpm.conf
+chmod -R 755 /tmp
+chmod -R 755 /var/lib/php/session/
+chown -R bubuka:bubuka /var/lib/php/session/
+/etc/init.d/php-fpm restart
+
+
+#Blitz
+cd /usr/local/src/
+wget http://alexeyrybak.com/blitz/blitz-0.6.10.tar.gz
+tar xvfz blitz-0.6.10.tar.gz
+cd blitz-0.6.10
+phpize
+sed -i 's/BLITZ_WITH_TIMELIB 1/BLITZ_WITH_TIMELIB 0/g' blitz.c
+./configure --enable-blitz
+make && make install
+echo "extension=blitz.so" > /etc/php.d/blitz.ini
+php -m | grep blitz
+
+
+#PHPMyAdmin
+mkdir /home/bubuka/web/pmd
+cd /home/bubuka/web/
+wget http://downloads.sourceforge.net/project/phpmyadmin/phpMyAdmin/3.4.3.1/phpMyAdmin-3.4.3.1-all-languages.tar.gz
+
+tar xvfz phpMyAdmin-3.4.3.1-all-languages.tar.gz
+cp -rf phpMyAdmin-3.4.3.1-all-languages/* pmd/
+rm -rf phpMyAdmin-3.4.3.1-all-languages phpMyAdmin-3.4.3.1-all-languages.tar.gz
+cd pmd
+cp config.sample.inc.php config.inc.php
+sed -i "s/''/'76ab1e661285ba5763c322b0b0d30ff9'/g" config.inc.php
+
